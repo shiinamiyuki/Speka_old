@@ -1,0 +1,59 @@
+//syntax of Speka
+/*
+Speka is a minimal OO language
+*/
+
+// full syntax, some of which are only sugar and maynot be implemented
+identifier = (letter | '_') { letter | digit}
+
+program ::= 
+
+class_def ::= "class" identifier ["=" identifier ]"{" class_block "}"
+
+class_block ::= {method_def}
+
+method_def ::= "def" identifier "(" arg_list ")" "{" block "}"
+
+block ::= "{" {stmt} "}" | stmt
+
+stmt ::= cond_stmt | while_stmt | for_stmt | ret_stmt | expr
+
+cond_stmt ::= "if" or_expr  block ["else" block]
+
+while_stmt ::= "while" or_expr  block
+
+for_stmt ::= "for" identifier "in" or_expr block
+
+ret_stmt ::= "return" or_expr "\n"
+
+expr ::=  postfix { assign_op or_expr } "\n"
+
+op ::= "=" | "+=" | "-=" | "*=" | "/=" | "%=" | := 
+
+or_expr ::= logic_term { "|"logic_term } | cond_expr
+
+logic_term ::= and_term { "&" and_term  }
+
+
+and_term ::= add_expr { ">" | "<" | "<=" | ">=" | "==" | "!=" add_expr } //| "(" or_expr ")"
+
+add_expr ::= [ "+"|"-"] term { ("+"|"-") term}.
+
+term ::= factor {("*"|"/") factor}.
+
+factor ::= "(" or_expr ")" | number  | post_fix | "!" prim_expr
+
+prim_expr ::= identifier | literal | "(" or_expr ")" 
+
+post_fix ::=  prim_expr {  idx_expr | call_expr }
+
+idx_expr ::= "[" or_expr "]" | "." identifier
+
+call_expr ::= "(" { call_arg } ")"
+
+call_arg ::= or_expr {"," or_expr }
+			
+
+/*
+the execution starts from the 'main' method of a class which has the same name of the file
+*/

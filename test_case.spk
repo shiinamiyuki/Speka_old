@@ -1,0 +1,144 @@
+//Speka.lang
+class System
+{
+    method print(x,y){
+        native print
+    }
+}
+class Object
+{
+    method new(){
+        return this
+    }
+}
+class Number = Object
+{
+    method new(i){
+        this.data = i
+        return this
+    }
+    method get(){
+        return this.data
+    }
+    method set(x){
+        this.data = x
+        return this
+    }
+}
+class Dict = Object
+{
+    method get(key){
+        native dict_get
+    }
+    method set(key,x){
+        native dict_set
+    }
+    method remove(key){
+        native dict_remove
+    }
+}
+//fixed length array
+class Array = Object
+{
+    method newArray(size){
+        native array_new
+    }
+    method new(size){
+        this.data = this.newArray(size)
+        this.size = size
+        return this
+    }
+     method get(i){
+        native array_get
+    }
+    method set(i,x){
+        native array_set
+    }
+    method length(){
+        return this.size
+    }
+}
+class Vector = Object
+{
+    method new(){
+        this.data = Array.new(64)
+        this.capacity = 64
+        this.size = 0
+        return this
+    }
+    method get(idx){
+        return this.data.get(idx)
+    }
+    method set(idx,x){
+        this.data.set(idx,x)
+    }
+    method length(){
+        return this.size
+    }
+    method append(x){
+        if this.size + 1 < this.capacity {
+            this.set(this.size,x)
+            this.size = this.size + 1
+        } else {
+            arr = Array.new(this.capacity * 2)
+            i = 0
+            while i < this.size {
+                arr.set(i,this.data.get(i)) //move the data
+                i = i + 1
+            }
+            this.data = arr
+            this.set(this.size,x)
+            this.size = this.size + 1
+        }
+    }
+}
+class Main
+{
+    method main(){
+       i = 0
+       while i< 10000000 {
+            i = i+1
+       }
+       System.print(i)
+    }
+}
+/*
+class Main
+{
+    method main(){
+        x = 1* 2 * 3 * 4
+        System.print(x,x*x)
+        y = System.f(x)
+        System.print(y,x*y)
+        if y<x
+            System.print(1)
+        else
+            System.print(2)
+        dx = 0.0001
+        x = 0
+        sum = 0
+        while x<1 {
+            sum = sum + dx*System.f(x)
+            x = x + dx
+        }
+     //   sum = dx+System.f(x)
+        System.print(4*sum)
+        
+    }    
+}*/
+/*
+class Array{
+    method map(mapper){
+        arr = Array.new()
+        for i in this.data {
+            arr.append(mapper.apply(i))
+        }
+        return arr;
+    }
+}
+
+class Main{
+    method main(){
+        print("Hello world!")
+    }
+}*/
