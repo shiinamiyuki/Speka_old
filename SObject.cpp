@@ -40,7 +40,7 @@ void SObject::setClosure(Ptr<SClosure> c)
 	t = Type::Closure;
 	function = c;
 }
-#define SOBJECT_OP_TEMPLATE(op)  SObject o; if (isInt()) { \
+#define SOBJECT_OP_TEMPLATE(op)  static SObject o; if (isInt()) { \
 										if (rhs.isInt()) \
 										{ \
 											o.setInt(intValue() op rhs.intValue()); \
@@ -67,7 +67,7 @@ void SObject::setClosure(Ptr<SClosure> c)
 											error(QString("illegal left operand type" ).append(QString::number(int(t)))); \
 										} \
 										return o;
-#define SOBJECT_LOGIC_OP_TEMPLATE(op)  SObject o; if (isInt()) { \
+#define SOBJECT_LOGIC_OP_TEMPLATE(op)  static SObject o; if (isInt()) { \
 										if (rhs.isInt()) \
 										{ \
 											o.setInt(intValue() op rhs.intValue()); \

@@ -172,7 +172,18 @@ public:
 	}
 	void compileFile(QString entry, QString& file) {
 		QTextStream ts(fopen(file.toStdString().c_str(), "r"));
-		compileString(entry,ts.readAll());
+		auto flib = fopen("lang.speka.spk", "r");
+		QString src = "";
+		if (!flib) {
+			fprintf(stderr, "lang.speka.spk not found! most of the language's function will be unusable!\n");
+		}
+		else{
+			QTextStream lib(flib);
+			src = lib.readAll();
+			src.append("\n");
+		}	
+		src.append(ts.readAll());
+		compileString(entry,src);
 	}
 	void launch() {
 		vm.eval();

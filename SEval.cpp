@@ -148,9 +148,10 @@ void SpekaVM::eval()
 	double d;
 	int i;
 	auto pp = prog.data();
-	while (pc < prog.size()) {
-	//	qDebug() << OptoString(prog[pc].op)<<prog[pc].attr;
-//		qDebug() << sp;
+	uint _size = prog.size();
+	while (pc < _size) {
+//		qDebug() << OptoString(prog[pc].op)<<prog[pc].attr << evalStack.size();
+	//	qDebug() << sp;
 		switch (pp[pc].op) {
 		case SOpcode::new_object:
 			a.setTable(Ptr<STable>(new STable(*classPool[*(int*)(pp[pc].operand)].tableValue())));
@@ -161,6 +162,7 @@ void SpekaVM::eval()
 			b = evalStack.pop();
 			a = evalStack.pop();
 			evalStack.push(a + b);
+	//		evalStack.top() = evalStack.top() + b;
 			pc++;
 			break;
 		case SOpcode::sub:
@@ -306,6 +308,7 @@ void SpekaVM::eval()
 		case SOpcode::load_attr:	// pop
 			a = evalStack.pop();
 	//		qDebug() << a.repr();
+		//	qDebug() << evalStack.size();
 			evalStack.push(a.key(pp[pc].attr));
 			pc++;
 			break;
@@ -350,6 +353,7 @@ void SpekaVM::eval()
 			pc++;
 			break;
 		case SOpcode::jmp_to_entry:
+			evalStack.clear();
 			pc = entry;
 			break;
 		case SOpcode::inc_bp:
@@ -428,7 +432,31 @@ void SGen::genExpr(Node node)
 void SGen::genBlock(Node node)
 {
 	if (node->type != codeBlock) {
-		genExpr(node);
+		auto i = node;
+		if (i->type == conditional) {
+			genCond(i);
+		}
+		else if (i->type == whileLoop) {
+			genWhile(i);
+		}
+		else if (i->type == forLoop) {
+			genFor(i);
+		}
+		else if (i->type == nativeCall) {
+			genNative(i);
+			//	write(SOpcode::pop_top, 0, QString::null);
+		}
+		else if (i->type == functionCall) {
+			genCall(i);
+			write(SOpcode::pop_top, 0, QString::null);
+		}
+		else if (i->type == ret) {
+			genReturn(i);
+		}
+		else {
+			genExpr(i);
+			write(SOpcode::pop_top, 0, QString::null);
+		}
 		return;
 	}
 	//node->print();
@@ -444,7 +472,7 @@ void SGen::genBlock(Node node)
 		}
 		else if (i->type == nativeCall) {
 			genNative(i);
-			write(SOpcode::pop_top, 0, QString::null);
+		//	write(SOpcode::pop_top, 0, QString::null);
 		}
 		else if (i->type == functionCall) {
 			genCall(i);
@@ -463,16 +491,19 @@ void SGen::genBlock(Node node)
 
 void SGen::genCond(Node node)
 {
+//	node->print();
 	genExpr(node->first());		// cond
 //	qDebug() << "---------------------cond";
 	uint bzIdx = output.size();
 	write(SOpcode::bz, 0, QString::null);	// jmp to else
 	genBlock(node->second());	
 	if (node->subNodes.size() == 3) { //else 
-//		qDebug() << "---------------------else";
-		*(int*)(output[bzIdx].operand) = output.size() + 1;
+	//	qDebug() << "---------------------else";
+		
 		uint elseEnd = output.size();
 		write(SOpcode::jmp, 0, QString::null); // jmp to elseEnd
+		*(int*)(output[bzIdx].operand) = output.size();
+	//	node->subNodes[2]->print();
 		genBlock(node->subNodes[2]);
 		*(int*)(output[elseEnd].operand) = output.size();
 	}
@@ -581,11 +612,12 @@ void SGen::genBinaryOp(Node node)
 
 void SGen::genUnaryOp(Node node)
 {
+	genExpr(node->first());
 	if (node->content == "!")
 		write(SOpcode::not, 0, QString::null);
 	else if(node->content == "-")
 		write(SOpcode::neg, 0, QString::null);
-	genExpr(node->first());
+	
 }
 
 void SGen::genAssignOp(Node node)

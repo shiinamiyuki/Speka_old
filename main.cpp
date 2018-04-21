@@ -15,7 +15,10 @@ int main(int argc, char *argv[])
 	try {
 		SpekaRunTime rt;
 		rt.init();
-		rt.compileFile("Main", QString("test_case.spk"));
+		if (argc > 1)
+			rt.compileFile("Main", QString(argv[1]));
+		else
+			rt.compileFile("Main", QString("test_case.spk"));
 		qDebug() <<"elapsed:" <<timing([&]() {
 			rt.launch();}) << "ms";
 		
