@@ -1,16 +1,29 @@
 //Speka.lang
-class System
-{
-    method print(x,y){
-        native print
-    }
-}
 class Object
 {
     method new(){
         return this
     }
+    method toInt(){
+        return 0
+    }
+    method toFloat(){
+        return 0
+    }
+    method toStr(){
+    //  return ""
+    }
+    method equals(obj){
+        return this == obj
+    }
 }
+class System
+{
+    method print(x,y){
+        native system_print
+    }
+}
+
 class Number = Object
 {
     method new(i){
@@ -76,6 +89,7 @@ class Array = Object
         return 0
     }
 }
+//dynamic array
 class Vector = Array
 {
     method new(){
@@ -84,11 +98,11 @@ class Vector = Array
         this.size = 0
         return this
     }
-    method get(idx){
-        return this.data.get(idx)
+    method get(index){
+        return this.data.get(index)
     }
-    method set(idx,x){
-        this.data.set(idx,x)
+    method set(index,x){
+        this.data.set(index,x)
     }
     method length(){
         return this.size
@@ -145,6 +159,15 @@ class Math
     }
     method tan(x){
         native math_tan
+    }
+    method atan(x){
+        native math_atan
+    }
+    method asin(x){
+        native math_asin
+    }
+    method acos(x){
+        native math_acos
     }
     method pow(x,y){
         native math_pow

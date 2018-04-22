@@ -62,12 +62,14 @@ struct SOperation
 };
 class SGen
 {
-	Map<QString, uint>	varMap;		// since Speka only has function scope, one varmap for each method is enough
-	Map<QString, uint>	classMap;
-	Map<QString, uint>	natives;
-	QString				entryClass;
-	SProgram			output;
-	uint				entryPoint;
+	Map<QString, uint>		varMap;		// since Speka only has function scope, one varmap for each method is enough
+	Map<QString, uint>		classMap;
+	Map<QString, QString>	superMap;
+	Map<QString, uint>		natives;
+	QString					entryClass;
+	SProgram				output;
+	uint					entryPoint;
+	QString					currentClass;
 public:
 	void preprocess(Node);			//this will scan all the class definions
 	void gen(Node);
@@ -158,6 +160,15 @@ public:
 		vm.regFunc(m, nativeCount);
 		nativeCount++;
 	}
+	void compileString(QString& s) {
+		Parser p(s);
+		auto n = p.prog();
+		if (n) {
+			n->clean();
+			//		n->print();
+		}
+		gen.gen(n);
+	}
 	void compileString(QString entry,QString& s) {
 		Parser p(s);
 		auto n = p.prog();
@@ -172,16 +183,18 @@ public:
 	}
 	void compileFile(QString entry, QString& file) {
 		QTextStream ts(fopen(file.toStdString().c_str(), "r"));
-		auto flib = fopen("lang.speka.spk", "r");
 		QString src = "";
+	/*	auto flib = fopen("lang.speka.spk", "r");
+		
 		if (!flib) {
 			fprintf(stderr, "lang.speka.spk not found! most of the language's function will be unusable!\n");
 		}
 		else{
 			QTextStream lib(flib);
-			src = lib.readAll();
-			src.append("\n");
-		}	
+			compileString("",lib.readAll());
+	//		src = lib.readAll();
+	//		src.append("\n");
+		}	*/
 		src.append(ts.readAll());
 		compileString(entry,src);
 	}

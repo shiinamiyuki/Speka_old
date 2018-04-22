@@ -90,6 +90,14 @@ public:
 		else
 			error(QString("illegal type for toInt()"));
 	}
+	double toFloat()const {
+		if (isFloat())
+			return floatValue();
+		else if (isInt())
+			return intValue();
+		else
+			error(QString("illegal type for toFloat()"));
+	}
 	~SObject();
 };
 bool operator== (const SObject& a, const SObject&b);

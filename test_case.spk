@@ -1,16 +1,26 @@
 class Main
 {
     method f(x){
-        if x==0
-            return 1
-        else
-            return x*Main.f(x-1)
+        x.p()
     }
     method main(){
-        i = 10
-        v = Vector.new()
-        v.append(i)
-        System.print(Math.Pi())
+       System.print(4*Math.atan(1) - Math.Pi())
+    }
+}
+class Vec2
+{
+    method new(x,y) {
+        this.x = x
+        this.y = y
+        return this
+    }
+}
+class Vec3 = Vec2
+{
+    method new(x,y,z) {
+        this = super.new(x,y)
+        this.z = z
+        return this
     }
 }
 /*

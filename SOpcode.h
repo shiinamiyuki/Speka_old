@@ -43,5 +43,6 @@ enum class SOpcode
 	jmp_to_entry,
 	inc_bp,
 	neg,
-	new_object
+	new_object,
+	set_this
 };

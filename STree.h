@@ -19,6 +19,8 @@ const QString ret = "return";
 const QString whileLoop = "while";
 const QString forLoop = "for";
 const QString nativeCall = "native_call";
+const QString import = "import";
+const QString stringLiteral = "string";
 class STree;
 typedef QSharedPointer<STree> Node;
 class STree
@@ -40,6 +42,7 @@ public:
 	void setSecond(Node p) { if (p) { subNodes[1] = p; }  else panic();}
 	void print(uint depth = 0);
 	void clean();
+	void reshape();
 	void panic() {
 		throw std::runtime_error("parser critical error");
 	}

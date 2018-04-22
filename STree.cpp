@@ -33,6 +33,30 @@ void STree::clean()
 		while (subNodes.size() > 0&&subNodes.last().isNull())
 			subNodes.removeLast();
 	}
+	reshape();
+}
+
+void STree::reshape()
+{
+	for (auto i : subNodes) {
+		if (i)
+			i->reshape();
+	}
+	// += a b -> a = a + b
+	//  op=						=
+	//a    b				a		op
+	//							a			b
+	if (type == asgnOp && content.endsWith("=") && content.length() == 2) {
+		Node node(new STree(binaryOp));
+		node->content = content[0];
+		content = "=";
+		auto left = first();
+		auto right = second();
+		node->setFirst(left);
+		node->setSecond(right);
+		setSecond(node);
+	//	print();
+	}
 }
 
 STree::~STree()
@@ -374,7 +398,7 @@ Node Parser::method_def()
 		func->setFirst(arg);
 	}
 	next();
-	skipSpace();
+	skipLineAndSpace();
 	check('{');
 	func->setSecond(block());
 	return func;
@@ -558,7 +582,18 @@ Node Parser::prim_expr()
 Node Parser::string()
 {
 	PRE_DO(string);
-	return Node();
+	Node n(new STree(stringLiteral));
+	QString s = "";
+	QChar start = cur();
+	next();
+	while (cur() != start) {
+		s += cur();
+		next();
+	}
+	next();
+	n->content = s;
+	//qDebug() << s;
+	return n;
 }
 
 Node Parser::list()
@@ -573,6 +608,22 @@ Node Parser::prog()
 	n->subNodes.clear();
 	skipSpace();
 	while (pos < src.size()) {
+		if (matchWord(QString("import")))
+		{
+			expect(QString("import"));
+			Node node(new STree("import"));
+			QString s = "";
+			while (cur() != "\n") {
+				s += cur();
+				next();
+			}
+			next();
+			if (s.endsWith(".spk") == false) {
+				s.append(".spk");
+			}
+			node->content = s.trimmed();
+			n->add(node);
+		}
 		n->add(classDef());
 		skipLineAndSpace();
 	}

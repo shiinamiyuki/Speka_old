@@ -252,6 +252,11 @@ void SpekaVM::eval()
 			evalStack.push(a);
 			pc++;
 			break;
+		case SOpcode::load_const_str:
+			a.setString(Ptr<SStr>(new SStr(pp[pc].attr)));
+			evalStack.push(a);
+			pc++;
+			break;
 		case SOpcode::load_local:
 			i = *(int*)(pp[pc].operand);
 			evalStack.push(stack[vp + i]);
@@ -365,6 +370,10 @@ void SpekaVM::eval()
 			evalStack.push(objectStack.top());
 			pc++;
 			break;
+		case SOpcode::set_this:
+			objectStack.top() = evalStack.top();
+			pc++;
+			break;
 		}
 	//	qDebug() << "size = " << evalStack.size() << evalStack[0].repr();
 	}
@@ -381,12 +390,31 @@ void SGen::preprocess(Node)
 void SGen::gen(Node n)
 {
 	for (auto i : n->subNodes) {
-		auto name = i->content;
-		addClass(name);
+		if (i->type == classDefinition) {
+			auto name = i->content;
+			addClass(name);
+		}
+		else if (i->type == import) {
+
+			FILE* file = fopen(i->content.toStdString().c_str(), "r");
+			if (!file) {
+				error(i->content.append(" not found!").toStdString().c_str());
+			}
+			QTextStream ts(file);
+			Parser p(ts.readAll());
+			auto n = p.prog();
+			n->clean();
+			//		n->print();
+
+			gen(n);
+		}
 	}
 	
 	for (auto i : n->subNodes) {
-		genClass(i);
+		if (i->type == classDefinition) {
+			genClass(i);
+		}
+		
 	}
 }
 
@@ -416,9 +444,10 @@ void SGen::genExpr(Node node)
 		}
 		else {
 		//	qDebug() << "var decl" << node->content;
-			varDecl(node->content);
-			write(SOpcode::inc_bp, 0, QString::null);
-			write(SOpcode::load_local, getLocal(node->content), QString::null);
+			error(QString("undefined variable:").append(node->content).toStdString().c_str());
+	//		varDecl(node->content);
+	//		write(SOpcode::inc_bp, 0, QString::null);
+	//		write(SOpcode::load_local, getLocal(node->content), QString::null);
 		}
 	}
 	else if (node->type == num) {
@@ -426,6 +455,9 @@ void SGen::genExpr(Node node)
 			write(SOpcode::load_const_f, node->content.toDouble(), QString::null);
 		else
 			write(SOpcode::load_const_i, node->content.toInt(), QString::null);
+	}
+	else if (node->type == stringLiteral) {
+		write(SOpcode::load_const_str, 0, node->content);
 	}
 }
 
@@ -646,7 +678,8 @@ void SGen::genAssignOp(Node node)
 					write(SOpcode::set_class, classMap[s], QString::null);
 				}
 				else if (s == "this") {
-					error("this cannot be assigned");
+					write(SOpcode::set_this, 0, QString::null);
+			//		error("this cannot be assigned");
 				}
 				else {
 					varDecl(s);
@@ -674,26 +707,41 @@ void SGen::genCall(Node node)
 	if (callee->subNodes.size() != 2) {
 		error("illegal call syntax");
 	}
-	if (callee->second()->content == "new") {	//constructor
-												//before calling the new() method, we have to insert few commands to create a new object on the stack
-	//	qDebug() << "class" << callee->first()->content;
-		write(SOpcode::new_object, classMap[callee->first()->content], QString::null);
+	if (callee->first()->content != "super") {
+		if (callee->second()->content == "new") {	//constructor
+													//before calling the new() method, we have to insert few commands to create a new object on the stack
+		//	qDebug() << "class" << callee->first()->content;
+			write(SOpcode::new_object, classMap[callee->first()->content], QString::null);
+		}
+		else
+			genExpr(callee->first());
+		write(SOpcode::dup, 0, QString::null);					//we need two copys of the object, one for this_ptr, one for the method
+		write(SOpcode::push_this, 0, QString::null);
+		write(SOpcode::load_attr, 0, callee->second()->content);//load method name, now the top is the method
+		write(SOpcode::call, count, QString::null);
 	}
-	else
-		genExpr(callee->first());
-	write(SOpcode::dup, 0, QString::null);					//we need two copys of the object, one for this_ptr, one for the method
-	write(SOpcode::push_this, 0, QString::null);
-	write(SOpcode::load_attr, 0, callee->second()->content);//load method name, now the top is the method
-	write(SOpcode::call, count, QString::null);
+	else {														//calling a super method
+		write(SOpcode::load_this, 0, QString::null);
+		write(SOpcode::push_this, 0, QString::null);			//pushing this ptr
+		write(SOpcode::load_class, classMap[superMap[currentClass]], QString::null); //load super
+		write(SOpcode::load_attr, 0, callee->second()->content);
+		write(SOpcode::call, count, QString::null);
+	}
 }
 
 void SGen::genClass(Node node)
 {
 	auto name = node->content;
-	
+	currentClass = name;
 	if (node->content2.isEmpty() == false) {
 		write(SOpcode::load_class, classMap[node->content2], QString::null);
 		write(SOpcode::set_class, classMap[node->content], QString::null);
+		superMap.insert(name, node->content2);
+	}
+	else {	//default inheriting Object
+		write(SOpcode::load_class, classMap["Object"], QString::null);
+		write(SOpcode::set_class, classMap["Object"], QString::null);
+		superMap.insert(name, "Object");
 	}
 	//	SRT's classPool will be intialilzed so are the unused class object will be set to empty
 	for (auto i : node->subNodes) {
@@ -728,6 +776,9 @@ uint SGen::genMethod(Node node)
 
 uint SGen::getLocal(QString s)
 {
+	if (varMap.contains(s) == false) {
+		error(QString(s).append(" undefined variable").toStdString().c_str());
+	}
 	return varMap[s];
 }
 
