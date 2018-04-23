@@ -1,0 +1,57 @@
+//an algorithm to solve Project Euler problem 122  https://projecteuler.net/problem=122
+//it took around 433s to get the solution
+import lang.speka
+class PE122
+{
+    method new(){
+        this.set = Vector.new()
+        this.set.append(1)
+        this.min = 99999
+        return this
+    }
+    method find(N,step){
+        if step >= this.min | this.set.last()> N
+            return 0
+        i = 0
+        while i < this.set.length(){
+            if this.set.get(this.set.length() - i -1) + this.set.last() == N
+            {
+                
+                if step < this.min {
+                    this.min = step
+                    return 0
+                }
+            }
+            i += 1
+        }
+         i = 0
+        while i < this.set.length(){
+            if this.set.get(this.set.length() - i -1) + this.set.last() < N
+            {
+                this.set.append(this.set.get(this.set.length() - i -1) + this.set.last())
+                this.find(N,step + 1)
+                if this.min <= step {
+                    return 0
+                }
+                this.set.removeLast()
+            }
+            i += 1
+        }
+    }
+}
+class Main
+{
+   
+    method main(){
+        sum = 0
+        k = 2 
+        while k <= 200 {
+            p = PE122.new()
+            p.find(k,0)
+            sum += p.min + 1 // well, p.min is actually the actual answer minus 1 ...
+            k += 1
+           
+        }
+        System.print(sum)
+    }
+}
