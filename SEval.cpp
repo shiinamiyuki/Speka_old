@@ -135,24 +135,25 @@ void SpekaVM::init()
 		o.setTable(Ptr<STable>(new STable()));
 		classPool.push(o);
 	}
+	pc = 0;
 }
 
 void SpekaVM::eval()
 {
 	SObject a, b;
-	bp = sp = pc = 0;
+	bp = sp =0;
 	vp = 0;
-//	pc = 10;
-//	entry = 10;
 	evalStack.clear();
 	double d;
 	int i;
 	auto pp = prog.data();
 	uint _size = prog.size();
 	while (pc < _size) {
-//		qDebug() << OptoString(prog[pc].op)<<prog[pc].attr << evalStack.size();
-	//	qDebug() << sp;
+	//	qDebug() << OptoString(prog[pc].op)<<prog[pc].attr << evalStack.size();
+	//	qDebug() << pc;
 		switch (pp[pc].op) {
+		case SOpcode::halt:
+			return;
 		case SOpcode::new_object:
 			a.setTable(Ptr<STable>(new STable(*classPool[*(int*)(pp[pc].operand)].tableValue())));
 			evalStack.push(a);
@@ -160,75 +161,63 @@ void SpekaVM::eval()
 			break;
 		case SOpcode::add:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a + b);
-	//		evalStack.top() = evalStack.top() + b;
+			evalStack.top() += b;
 			pc++;
 			break;
 		case SOpcode::sub:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a - b);
+			evalStack.top() -= b;
 			pc++;
 			break;
 		case SOpcode::mul:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a * b);
+			evalStack.top() *= b;
 			pc++;
 			break;
 		case SOpcode::div:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a / b);
+			evalStack.top() /= b;
 			pc++;
 			break;
 		case SOpcode::eq:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a.eq(b));
+			evalStack.top().eq(b);
 			pc++;
 			break;
 		case SOpcode::ne:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a != b);
+			evalStack.top() != b;
 			pc++;
 			break;
 		case SOpcode::lt:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a.lt( b));
+			evalStack.top().lt( b);
 			pc++;
 			break;
 		case SOpcode::gt:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a > b);
+			evalStack.top() > b;
 			pc++;
 			break;
 		case SOpcode::le:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a <= b);
+			evalStack.top() <=  b;
 			pc++;
 			break;
 		case SOpcode::ge:
 			b = evalStack.pop();
 			a = evalStack.pop();
-			evalStack.push(a >= b);
+			evalStack.top() >= b;
 			pc++;
 			break;
 		case SOpcode::or:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a || b);
+			evalStack.top() |= b;
 			pc++;
 			break;
 		case SOpcode::and:
 			b = evalStack.pop();
-			a = evalStack.pop();
-			evalStack.push(a && b);
+			evalStack.top() &= b;
 			pc++;
 			break;
 		case SOpcode::not:
@@ -279,8 +268,10 @@ void SpekaVM::eval()
 			pc = evalStack.pop().functionValue()->addr; //crucial: the function is on evalStack. not stack
 			break;
 		case SOpcode::ret:
-			if (callStack.isEmpty())
+			if (callStack.isEmpty()) {
+				pc = entry;
 				return;
+			}
 			objectStack.pop();			
 			callStack.pop();
 			pc = callStack.top().pc;
@@ -306,14 +297,16 @@ void SpekaVM::eval()
 			pc++;
 			objectStack.push(evalStack.pop());
 			break;
+		case SOpcode::push_nil:
+			objectStack.push(SObject());
+			pc++;
+			break;
 		case SOpcode::call_native:
-			nativeMethod[*(int*)(pp[pc].operand)](this);
+			nativeMethod[*(int*)(pp[pc].operand)](this,userData);
 			pc++;
 			break;
 		case SOpcode::load_attr:	// pop
 			a = evalStack.pop();
-	//		qDebug() << a.repr();
-		//	qDebug() << evalStack.size();
 			evalStack.push(a.key(pp[pc].attr));
 			pc++;
 			break;
@@ -324,7 +317,6 @@ void SpekaVM::eval()
 			break;
 		case SOpcode::load_idx:
 			a = evalStack.pop();
-			//		qDebug() << a.repr();
 			evalStack.push(a.key(pp[pc].attr));
 			pc++;
 			break;
@@ -359,7 +351,8 @@ void SpekaVM::eval()
 			break;
 		case SOpcode::jmp_to_entry:
 			evalStack.clear();
-			pc = entry;
+			pc = *(uint*)pp[pc].operand;
+			entry = pc;
 			break;
 		case SOpcode::inc_bp:
 			bp++;
@@ -380,6 +373,42 @@ void SpekaVM::eval()
 	qDebug() << evalStack.top().repr();
 }
 
+void SpekaVM::createThread(SObject obj, uint threadFunc)
+{
+	std::thread th([&,threadFunc]() {
+		qDebug() << (uint)threadFunc;
+		SpekaVM vm;		
+		vm.init();
+		vm.nativeMethod = this->nativeMethod;
+		vm.classPool = this->classPool;
+		vm.prog = prog;
+		vm.objectStack.clear();
+		vm.objectStack.push(obj);
+		vm.pc = threadFunc;
+		vm.stack.clear();
+		vm.callStack.clear();
+		vm.evalStack.clear();
+		vm.specialEval();
+		
+	});
+	th.detach();
+}
+
+void SpekaVM::specialEval()
+{
+	
+	std::thread th([&]()
+	{
+		while (1) {
+		//	qDebug() << "pc"<<this->pc << OptoString(prog[pc].op);
+			Sleep(5);
+		}
+	});
+	th.detach();
+	eval();
+	while (1)Sleep(50);
+}
+
 
 
 
@@ -389,6 +418,7 @@ void SGen::preprocess(Node)
 
 void SGen::gen(Node n)
 {
+	addClass("Global");
 	for (auto i : n->subNodes) {
 		if (i->type == classDefinition) {
 			auto name = i->content;
@@ -414,7 +444,14 @@ void SGen::gen(Node n)
 		if (i->type == classDefinition) {
 			genClass(i);
 		}
-		
+		else if (i->type == functionDef) {
+			currentClass = "Global";
+			genMethod(i);
+		}
+		else {
+			currentClass = "Global";
+			genStmt(i);
+		}
 	}
 }
 
@@ -442,6 +479,10 @@ void SGen::genExpr(Node node)
 		else if (varMap.contains((node->content))) {
 			write(SOpcode::load_local, getLocal(node->content), QString::null);
 		}
+		else if (globals.contains(node->content)) {
+			write(SOpcode::load_class,classMap["Global"], QString::null);
+			write(SOpcode::load_attr, 0, node->content);
+		}
 		else {
 		//	qDebug() << "var decl" << node->content;
 			error(QString("undefined variable:").append(node->content).toStdString().c_str());
@@ -465,59 +506,13 @@ void SGen::genBlock(Node node)
 {
 	if (node->type != codeBlock) {
 		auto i = node;
-		if (i->type == conditional) {
-			genCond(i);
-		}
-		else if (i->type == whileLoop) {
-			genWhile(i);
-		}
-		else if (i->type == forLoop) {
-			genFor(i);
-		}
-		else if (i->type == nativeCall) {
-			genNative(i);
-			//	write(SOpcode::pop_top, 0, QString::null);
-		}
-		else if (i->type == functionCall) {
-			genCall(i);
-			write(SOpcode::pop_top, 0, QString::null);
-		}
-		else if (i->type == ret) {
-			genReturn(i);
-		}
-		else {
-			genExpr(i);
-			write(SOpcode::pop_top, 0, QString::null);
-		}
+		genStmt(i);
 		return;
 	}
 	//node->print();
 	for (auto i : node->subNodes)
 	{
-		if (i->type == conditional) {
-			genCond(i);
-		}
-		else if (i->type == whileLoop) {
-			genWhile(i);
-		}else if (i->type == forLoop) {
-			genFor(i);
-		}
-		else if (i->type == nativeCall) {
-			genNative(i);
-		//	write(SOpcode::pop_top, 0, QString::null);
-		}
-		else if (i->type == functionCall) {
-			genCall(i);
-			write(SOpcode::pop_top, 0, QString::null);
-		}
-		else if (i->type == ret) {
-			genReturn(i);
-		}
-		else {
-			genExpr(i);
-			write(SOpcode::pop_top, 0, QString::null);
-		}
-		
+		genStmt(i);		
 	}
 }
 
@@ -547,15 +542,7 @@ void SGen::genCond(Node node)
 }
 
 void SGen::genWhile(Node node)
-{/*
-	uint start = output.size();
-	uint cond = compileExpr(node->subNodes[0]);
-	uint jmpIdx = output.size();
-	write(BZ, cond, (uint)0);
-	compileBlock(node->subNodes[1]);
-	write(JMP, start);
-	uint end = output.size();
-	*(uint*)(output.data() + jmpIdx + 1 + 4) = end;*/
+{
 	uint start = output.size();
 	genExpr(node->first());
 	uint jmpIdx = output.size();
@@ -563,6 +550,16 @@ void SGen::genWhile(Node node)
 	genBlock(node->second());
 	write(SOpcode::jmp, start, QString::null);
 	*(int*)(output[jmpIdx].operand) = output.size();
+	for (uint i = start; i < output.size(); i++) {
+		if (output[i].op == SOpcode::break_holder) {
+			output[i].op = SOpcode::jmp;
+			*(int*)(output[i].operand) = output.size();
+		}
+		else if (output[i].op == SOpcode::continue_holder) {
+			output[i].op = SOpcode::jmp;
+			*(int*)(output[i].operand) = start;
+		}
+	}
 }
 
 void SGen::genFor(Node)
@@ -670,6 +667,9 @@ void SGen::genAssignOp(Node node)
 		else {
 			if (node->first()->type == iden)
 			{
+				if (currentClass == "Global") {
+					write(SOpcode::load_class, classMap["Global"], QString::null);
+				}
 				genExpr(node->second());
 				auto s = node->first()->content;
 				if(varMap.contains(s))
@@ -682,9 +682,15 @@ void SGen::genAssignOp(Node node)
 			//		error("this cannot be assigned");
 				}
 				else {
-					varDecl(s);
-					write(SOpcode::inc_bp, 0, QString::null);
-					write(SOpcode::set_local, getLocal(s), QString::null);
+					if (currentClass == "Global") {
+						write(SOpcode::set_attr, 0, s);
+						globals.insert(s);
+					}
+					else {
+						varDecl(s);
+						write(SOpcode::inc_bp, 0, QString::null);
+						write(SOpcode::set_local, getLocal(s), QString::null);
+					}
 				}
 			}
 		}
@@ -702,30 +708,44 @@ void SGen::genCall(Node node)
 		write(SOpcode::push, 0, QString::null);
 		count++;
 	}
-//	callee->print();
+	//callee->print();
 	//callee->first()->print();
-	if (callee->subNodes.size() != 2) {
-		error("illegal call syntax");
+	if (callee->subNodes.size()  == 0) {
+		write(SOpcode::push_nil, 0, QString::null);
+		genExpr(callee);
+		write(SOpcode::call, count, QString::null);
 	}
-	if (callee->first()->content != "super") {
-		if (callee->second()->content == "new") {	//constructor
-													//before calling the new() method, we have to insert few commands to create a new object on the stack
-		//	qDebug() << "class" << callee->first()->content;
-			write(SOpcode::new_object, classMap[callee->first()->content], QString::null);
+	else if(callee->subNodes.size() == 2){
+		if (callee->type == binaryOp) {
+			if (callee->first()->content != "super") {
+				if (callee->second()->content == "new") {	//constructor
+															//before calling the new() method, we have to insert few commands to create a new object on the stack
+				//	qDebug() << "class" << callee->first()->content;
+					write(SOpcode::new_object, classMap[callee->first()->content], QString::null);
+				}
+				else
+					genExpr(callee->first());
+				write(SOpcode::dup, 0, QString::null);					//we need two copys of the object, one for this_ptr, one for the method
+				write(SOpcode::push_this, 0, QString::null);
+				write(SOpcode::load_attr, 0, callee->second()->content);//load method name, now the top is the method
+				write(SOpcode::call, count, QString::null);
+			}
+			else {														//calling a super method
+				write(SOpcode::load_this, 0, QString::null);
+				write(SOpcode::push_this, 0, QString::null);			//pushing this ptr
+				write(SOpcode::load_class, classMap[superMap[currentClass]], QString::null); //load super
+				write(SOpcode::load_attr, 0, callee->second()->content);
+				write(SOpcode::call, count, QString::null);
+			}
 		}
-		else
-			genExpr(callee->first());
-		write(SOpcode::dup, 0, QString::null);					//we need two copys of the object, one for this_ptr, one for the method
-		write(SOpcode::push_this, 0, QString::null);
-		write(SOpcode::load_attr, 0, callee->second()->content);//load method name, now the top is the method
-		write(SOpcode::call, count, QString::null);
+		else if (callee->type == functionCall) {
+			write(SOpcode::push_nil, 0, QString::null);
+			genExpr(callee);
+			write(SOpcode::call, count, QString::null);
+		}
 	}
-	else {														//calling a super method
-		write(SOpcode::load_this, 0, QString::null);
-		write(SOpcode::push_this, 0, QString::null);			//pushing this ptr
-		write(SOpcode::load_class, classMap[superMap[currentClass]], QString::null); //load super
-		write(SOpcode::load_attr, 0, callee->second()->content);
-		write(SOpcode::call, count, QString::null);
+	else {
+		error("illegal call syntax");
 	}
 }
 
@@ -756,8 +776,45 @@ void SGen::genClass(Node node)
 	}
 }
 
+void SGen::genStmt(Node i)
+{
+	if (i->type == conditional) {
+		genCond(i);
+	}
+	else if (i->type == whileLoop) {
+		genWhile(i);
+	}
+	else if (i->type == forLoop) {
+		genFor(i);
+	}
+	else if (i->type == nativeCall) {
+		genNative(i);
+		//	write(SOpcode::pop_top, 0, QString::null);
+	}
+	else if (i->type == functionCall) {
+		genCall(i);
+		write(SOpcode::pop_top, 0, QString::null);
+	}
+	else if (i->type == ret) {
+		genReturn(i);
+	}
+	else if (i->type == breakFromLoop) {
+		write(SOpcode::break_holder, 0, QString::null);
+	}
+	else if (i->type == continueLoop) {
+		write(SOpcode::continue_holder, 0, QString::null);
+	}
+	else {
+		genExpr(i);
+		write(SOpcode::pop_top, 0, QString::null);
+	}
+}
+
+
 uint SGen::genMethod(Node node)
 {
+	if(currentClass == "Global")
+		globals.insert(node->content);
 	varMap.clear();
 	uint idx = output.size();
 	write(SOpcode::jmp, 0, QString::null);
@@ -765,12 +822,17 @@ uint SGen::genMethod(Node node)
 	auto arg = node->first();
 	for (auto i : arg->subNodes) {
 		varDecl(i->content);
-		
 	}
 	genBlock(node->second());
 	write(SOpcode::load_const_i,0, QString::null);	// default ret stmt; every method MUST return a value
 	write(SOpcode::ret, 0, QString::null);
 	*(uint*)(output[idx].operand) = output.size();
+	if (currentClass == "Global") {
+		write(SOpcode::load_class, classMap["Global"], QString::null);
+		write(SOpcode::load_function, addr, QString::null);
+		write(SOpcode::set_attr, 0, node->content);
+		globals.insert(node->content);
+	}
 	return addr;
 }
 
@@ -791,6 +853,8 @@ void SGen::varDecl(QString str)
 
 void SGen::addClass(QString s)
 {
+	if (classMap.contains(s))
+		return;
 	uint i = classMap.size();
 	classMap.insert(s, i);
 }
@@ -804,6 +868,66 @@ inline void SGen::write(SOpcode o, _Tp i, const QString& s)
 	op.attr = s;
 	*(_Tp*)(op.operand) = i;
 	output.append(op);
+}
+void SpekaRunTime::loadByteCode(const char * filename) {
+	FILE *f = fopen(filename, "rb");
+	while (!feof(f)) {
+		SOperation op;
+		op.op = (SOpcode)fgetc(f);
+		for (int i = 0;i < 8;i++) {
+			char c = fgetc(f);
+			op.operand[i] = c;
+		}
+		while (!feof(f)) {
+			char c = fgetc(f);
+			if (c)
+				op.attr.append(c);
+			else
+				break;
+		}
+		vm.prog.append(op);
+	}
+}
+
+void SpekaRunTime::repl()
+{
+	QTextStream in(stdin);
+	QTextStream out(stdout);
+	compileString(QString("import speka.lang\n"));
+	vm.prog.clear();
+	vm.loadProg(gen.out());
+	vm.eval();
+	out << "Speka 1.0 REPL\n";
+	out.flush();
+	while (1) {
+		out << "<";
+		out.flush();
+		QString s = "";
+		while (1) {
+			s.append(in.readLine());
+			s.append("\n");
+			bool f = true;
+			try {
+				Parser p(s);
+				p.prog();
+			}
+			catch (...) {
+				f = false;
+			}
+			if (f)
+				break;
+		}
+		try {
+		//	gen.output.clear();
+			compileString(s);
+			vm.loadProg(gen.out());
+			vm.eval();
+		}
+		catch (std::runtime_error & e)
+		{
+			qDebug() << e.what();
+		}
+	}
 }
 
 SPEKA_END

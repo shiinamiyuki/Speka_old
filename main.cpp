@@ -14,14 +14,19 @@ int main(int argc, char *argv[])
 {
 	QCoreApplication a(argc, argv);
 	try {
-				SpekaRunTime rt;
+		SpekaRunTime rt;
 		rt.init();
-		if (argc > 1)
-			rt.compileFile("Main", QString(argv[1]));
-		else
-			rt.compileFile("Main", QString("test_case.spk"));
-			qDebug() <<"elapsed:" <<timing([&]() {
-			rt.launch();}) << "ms";
+		if (argc > 1) {
+			rt.compileFile("main", QString(argv[1]));
+			rt.byteCodetoFile(QString(argv[1]).append("byte").toStdString().c_str());
+			qDebug() << "elapsed:" << timing([&]() {
+				rt.launch();}) << "ms";
+		}
+		else {
+			rt.repl();
+		}
+		
+		
 		
 	}
 	catch (std::exception&e) {

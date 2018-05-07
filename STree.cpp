@@ -296,7 +296,14 @@ Node Parser::stmt()
 	}
 	else if(matchWord(QString("return"))){
 		return retStmt();
-	}else if (matchWord(QString("native"))) {
+	}
+	else if (matchWord(QString("break"))) {
+		return breakStmt();
+	}
+	else if (matchWord(QString("continue"))) {
+		return continueStmt();
+	}
+	else if (matchWord(QString("native"))) {
 		return nativeCallStmt();
 	}
 	else {
@@ -342,14 +349,35 @@ Node Parser::retStmt()
 {
 	PRE_DO(retStmt);
 	expect(QString("return"));
+	skipSpace();	
 	Node n(new STree(ret));
+	if (cur() == '\n')
+		return n;
 	n->setFirst(or_expr());
 	skipSpace();
 	check('\n');
 	next();
 	return n;
 }
+Node Parser::breakStmt()
+{
+	PRE_DO(breakStmt);
+	expect(QString("break"));
+	skipSpace();
+	Node n(new STree(breakFromLoop));
+	check('\n');
+	return n;
+}
 
+Node Parser::continueStmt()
+{
+	PRE_DO(continueStmt);
+	expect(QString("continue"));
+	skipSpace();
+	Node n(new STree(continueLoop));
+	check('\n');
+	return n;
+}
 Node Parser::nativeCallStmt()
 {
 	PRE_DO(nativeCallStmt);
@@ -372,7 +400,7 @@ Node Parser::var_decl()
 Node Parser::method_def()
 {
 	PRE_DO(method_def);
-	expect(QString("method"));
+	expect(QString("def"));
 	skipLineAndSpace();
 	Node func(new STree(functionDef));
 	Node arg(new STree(callArg));
@@ -624,7 +652,15 @@ Node Parser::prog()
 			node->content = s.trimmed();
 			n->add(node);
 		}
-		n->add(classDef());
+		else if (matchWord(QString("def"))) {
+			n->add(method_def());
+		}
+		else if (matchWord(QString("class"))) {
+			n->add(classDef());
+		}
+		else {
+			n->add(stmt());
+		}		
 		skipLineAndSpace();
 	}
 	return n;
@@ -655,6 +691,8 @@ Node Parser::classDef()
 	next();
 	return n;
 }
+
+
 
 void Parser::newLine()
 {

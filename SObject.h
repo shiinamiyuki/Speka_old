@@ -32,19 +32,19 @@ public:
 	void setNil() { t = Type::none; }
 	void newArray(uint size);
 	uint arrayLength()const;
-	SObject operator + (const SObject&)const;
-	SObject operator - (const SObject&)const;
-	SObject operator * (const SObject&)const;
-	SObject operator / (const SObject&)const;
-	SObject operator && (const SObject&)const;
-	SObject operator || (const SObject&)const;
-	SObject operator % (const SObject&)const;
-	SObject operator > (const SObject&)const;
-	SObject operator >= (const SObject&)const;
-	SObject operator <= (const SObject&)const;
-	SObject lt (const SObject&)const;
-	SObject operator != (const SObject&)const;
-	SObject eq (const SObject&)const;
+	SObject& operator += (const SObject&);
+	SObject& operator -= (const SObject&);
+	SObject& operator *= (const SObject&);
+	SObject& operator /= (const SObject&);
+	SObject& operator &= (const SObject&);
+	SObject& operator |= (const SObject&);
+	SObject& operator %= (const SObject&);
+	SObject& operator > (const SObject&);
+	SObject& operator >= (const SObject&);
+	SObject& operator <= (const SObject&);
+	SObject& lt (const SObject&);
+	SObject& operator != (const SObject&);
+	SObject& eq (const SObject&);
 	SObject& operator = (const SObject&);
 	void neg();
 	void not();
@@ -54,17 +54,47 @@ public:
 	void setIdx(uint, SObject&);
 	void capture(SObject);
 	bool checkType(SObject& o);
-	inline bool isTable()const;
-	inline bool isFloat()const;
-	inline bool isInt()const;
-	inline bool isClosure()const;
-	inline bool isString()const;
+	inline bool isTable()const
+	{
+		return t == Type::Table;
+	}
+	inline bool isFloat()const
+	{
+		return t == Type::Float;
+	}
+	inline bool isInt()const
+	{
+		return t == Type::Int;
+	}
+	inline bool isClosure()const
+	{
+		return t == Type::Closure;
+	}
+	inline bool isString()const
+	{
+		return t == Type::String;
+	}
 	//these methods will do type checks
-	inline Ptr<STable> tableValue()const;
-	inline Ptr<SClosure> functionValue()const;
-	inline Ptr<SStr> strValue()const;
-	inline SFloat floatValue()const;
-	inline SInt intValue()const;
+	inline Ptr<STable> tableValue()const
+	{
+		return table;
+	}
+	inline Ptr<SClosure> functionValue()const
+	{
+		return function;
+	}
+	inline Ptr<SStr> strValue()const
+	{
+		return str;
+	}
+	inline SFloat floatValue()const
+	{
+		return dVal;
+	}
+	inline SInt intValue()const
+	{
+		return iVal;
+	}
 	void error(QString & s)const;
 	inline bool isTrue()const {
 		if (isInt())
@@ -98,7 +128,7 @@ public:
 		else
 			error(QString("illegal type for toFloat()"));
 	}
-	~SObject();
+	~SObject() = default;
 };
 bool operator== (const SObject& a, const SObject&b);
 class SClosure

@@ -3,6 +3,7 @@
 #include "SOpcode.h"
 #include "SObject.h"
 #include "STree.h"
+#include "Speka2Py.h"
 SPEKA_BEGIN
 struct SOperation;
 typedef Vec<SOperation> SProgram;
@@ -60,8 +61,10 @@ struct SOperation
 		return *this;
 	}
 };
+class SpekaRunTime;
 class SGen
 {
+	QSet<QString>			globals;
 	Map<QString, uint>		varMap;		// since Speka only has function scope, one varmap for each method is enough
 	Map<QString, uint>		classMap;
 	Map<QString, QString>	superMap;
@@ -71,6 +74,7 @@ class SGen
 	uint					entryPoint;
 	QString					currentClass;
 public:
+	friend class SpekaRunTime;
 	void preprocess(Node);			//this will scan all the class definions
 	void gen(Node);
 	void genExpr(Node);
@@ -85,6 +89,7 @@ public:
 	void genAssignOp(Node);
 	void genCall(Node);
 	void genClass(Node);
+	void genStmt(Node i);
 	uint genMethod(Node);
 	uint getLocal(QString);
 	void varDecl(QString);
@@ -92,7 +97,7 @@ public:
 	void setEntry(const QString&s) { entryClass = s; }
 	uint getEntry()const { return entryPoint; }
 	void error(const char*s) { throw std::runtime_error(s); }
-	void regFunc(const char*s, uint i) {
+	void addNative(const char*s, uint i) {
 		natives.insert(s, i);
 	}
 	template<typename _Tp>
@@ -107,7 +112,8 @@ struct CallFrame
 	uint vp;
 };
 class SpekaVM;
-typedef void (*NativeMethod)(SpekaVM*);
+class SpekaRunTime;
+typedef void (*NativeMethod)(SpekaVM*,void*);
 class SpekaVM
 {
 	FastStack<CallFrame>	callStack;
@@ -116,14 +122,19 @@ class SpekaVM
 	FastVec<SObject>		evalStack;
 	FastVec<SObject>		classPool;
 	FastVec<SObject>		objectStack;	//stores this pointer
+	FastVec<std::thread>	threadPool;
 	uint					pc;
 	uint					bp, sp, vp;
 	SProgram				prog;
+	void					*userData;
 	uint entry;
 public:
 	void init();
 	void eval();
-	void loadProg(SProgram& p) { prog = p;prog.append(SOperation());prog.last().op = SOpcode::jmp_to_entry; }
+	void loadProg(SProgram& p) {
+		prog = p;prog.append(SOperation());prog.last().op = SOpcode::halt;
+	*(uint*)prog.last().operand = entry;
+	}
 	SObject getArg(uint i) {
 		return stack[vp + i];
 	}
@@ -141,7 +152,10 @@ public:
 	//	pc++;
 	}
 	void setEntry(uint i) { entry = i; }
-	void regFunc(NativeMethod m, uint i) { nativeMethod[i] = m; }
+	void addNative(NativeMethod m, uint i) { nativeMethod[i] = m; }
+	void createThread(SObject obj, uint threadFunc);
+	void specialEval();
+	friend class SpekaRunTime;
 };
 class SpekaRunTime
 {
@@ -155,9 +169,9 @@ public:
 		vm.init();
 		loadLibrary();
 	}
-	void regFunc(const char* name, NativeMethod m) {
-		gen.regFunc(name, nativeCount);
-		vm.regFunc(m, nativeCount);
+	void addNative(const char* name, NativeMethod m) {
+		gen.addNative(name, nativeCount);
+		vm.addNative(m, nativeCount);
 		nativeCount++;
 	}
 	void compileString(QString& s) {
@@ -165,7 +179,6 @@ public:
 		auto n = p.prog();
 		if (n) {
 			n->clean();
-			//		n->print();
 		}
 		gen.gen(n);
 	}
@@ -174,33 +187,58 @@ public:
 		auto n = p.prog();
 		if (n) {
 			n->clean();
-	//		n->print();
 		}
 		gen.setEntry(entry);
 		gen.gen(n);
-		vm.loadProg(gen.out());
 		vm.setEntry(gen.getEntry());
+		vm.loadProg(gen.out());
+		vm.prog.pop_back();
+		vm.prog.append(SOperation());
+		vm.prog.last().op = SOpcode::jmp_to_entry;
+		*(uint*)vm.prog.last().operand = vm.entry;
+		
 	}
 	void compileFile(QString entry, QString& file) {
 		QTextStream ts(fopen(file.toStdString().c_str(), "r"));
 		QString src = "";
-	/*	auto flib = fopen("lang.speka.spk", "r");
-		
-		if (!flib) {
-			fprintf(stderr, "lang.speka.spk not found! most of the language's function will be unusable!\n");
-		}
-		else{
-			QTextStream lib(flib);
-			compileString("",lib.readAll());
-	//		src = lib.readAll();
-	//		src.append("\n");
-		}	*/
 		src.append(ts.readAll());
 		compileString(entry,src);
 	}
 	void launch() {
-		vm.eval();
+		try {
+			vm.eval();
+		}
+		catch (std::exception & e) {
+			QTextStream ts(stdout);
+			ts << "exception caught at pc = " << vm.pc << " " << (int)vm.prog[vm.pc].op << "\n";
+			ts << e.what();
+		}
 	}
+	QString toPy(QString &filename) {
+		QTextStream ts(fopen(filename.toStdString().c_str(), "r"));
+		QString s = ts.readAll();
+		Parser p(s);
+		auto n = p.prog();
+		n->clean();
+	//	n->print();
+		Speka2Py py;
+		py.toPy(n);
+		return py.out().append("\nMain.main()\n");
+	}
+	void byteCodetoFile(const char* filename) {
+		FILE *f = fopen(filename, "wb");
+		for (auto i : vm.prog)
+		{
+			char buffer1[1];
+			*(char*)buffer1 = (char)i.op;
+			fwrite(buffer1, sizeof(char), 1, f);
+			fwrite(&(i.operand), sizeof(char), 8, f);
+			fwrite(i.attr.toStdString().c_str(), sizeof(char), i.attr.size()+1, f);
+		}
+		fclose(f);
+	}
+	void loadByteCode(const char*filename);
+	void repl();
 };
 SPEKA_END
 

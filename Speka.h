@@ -8,7 +8,7 @@
 #include <qdebug.h>
 #include <qstack.h>
 #include <Windows.h>
-
+#include <thread>
 
 #define SPEKA_BEGIN namespace Speka{
 #define SPEKA_END }
@@ -20,4 +20,4 @@
 typedef long long SInt;
 typedef double SFloat;
 typedef QString SStr;
-typedef  QString SKey;
+typedef  uint SKey;

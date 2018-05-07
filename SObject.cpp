@@ -40,13 +40,13 @@ void SObject::setClosure(Ptr<SClosure> c)
 	t = Type::Closure;
 	function = c;
 }
-#define SOBJECT_OP_TEMPLATE(op)  static SObject o; if (isInt()) { \
+#define SOBJECT_OP_TEMPLATE(op)  if (isInt()) { \
 										if (rhs.isInt()) \
 										{ \
-											o.setInt(intValue() op rhs.intValue()); \
+											setInt(intValue() op rhs.intValue()); \
 										} \
 										else if (rhs.isFloat()) { \
-											o.setFloat(intValue() op rhs.floatValue()); \
+											setFloat(intValue() op rhs.floatValue()); \
 										} \
 										else \
 										{ \
@@ -55,10 +55,10 @@ void SObject::setClosure(Ptr<SClosure> c)
 										} \
 										else if (isFloat()) { \
 											if (rhs.isFloat()) { \
-												o.setFloat(floatValue() op rhs.floatValue()); \
+												setFloat(floatValue() op rhs.floatValue()); \
 											} \
 											else if (rhs.isInt()) { \
-												o.setFloat(floatValue() op rhs.intValue()); \
+												setFloat(floatValue() op rhs.intValue()); \
 											} \
 											else { \
 												error(QString("illegal right operand type ").append(QString::number(int(t)))); \
@@ -66,14 +66,14 @@ void SObject::setClosure(Ptr<SClosure> c)
 										} else { \
 											error(QString("illegal left operand type" ).append(QString::number(int(t)))); \
 										} \
-										return o;
-#define SOBJECT_LOGIC_OP_TEMPLATE(op)  static SObject o; if (isInt()) { \
+										return *this;
+#define SOBJECT_LOGIC_OP_TEMPLATE(op)   if (isInt()) { \
 										if (rhs.isInt()) \
 										{ \
-											o.setInt(intValue() op rhs.intValue()); \
+											setInt(intValue() op rhs.intValue()); \
 										} \
 										else if (rhs.isFloat()) { \
-											o.setInt(intValue() op rhs.floatValue()); \
+											setInt(intValue() op rhs.floatValue()); \
 										} \
 										else \
 										{ \
@@ -82,10 +82,10 @@ void SObject::setClosure(Ptr<SClosure> c)
 										} \
 										else if (isFloat()) { \
 											if (rhs.isFloat()) { \
-												o.setInt(floatValue() op rhs.floatValue()); \
+												setInt(floatValue() op rhs.floatValue()); \
 											} \
 											else if (rhs.isInt()) { \
-												o.setInt(floatValue() op rhs.intValue()); \
+												setInt(floatValue() op rhs.intValue()); \
 											} \
 											else { \
 												error(QString("illegal right operand type ").append(QString::number(int(t)))); \
@@ -93,7 +93,7 @@ void SObject::setClosure(Ptr<SClosure> c)
 										} else { \
 											error(QString("illegal left operand type ").append(QString::number(int(t)))); \
 										} \
-										return o;
+										return *this;
 
 #if 1
 void SObject::newArray(uint size)
@@ -111,68 +111,66 @@ uint SObject::arrayLength() const
 		error(QString("only table objects can call arrayLenght()"));
 	}
 }
-SObject  SObject::operator+(const SObject &rhs)const
+SObject&  SObject::operator+=(const SObject &rhs)
 {
 	SOBJECT_OP_TEMPLATE(+)
 }
 
-SObject  SObject::operator-(const SObject &rhs)const
+SObject&  SObject::operator-=(const SObject &rhs)
 {
 	SOBJECT_OP_TEMPLATE(-)
 }
 
-SObject  SObject::operator*(const SObject &rhs)const
+SObject&  SObject::operator*=(const SObject &rhs)
 {
 	SOBJECT_OP_TEMPLATE(*)
 }
 
-SObject  SObject::operator/(const SObject &rhs)const
+SObject&  SObject::operator/=(const SObject &rhs)
 {
 	SOBJECT_OP_TEMPLATE(/)
 }
-SObject  SObject::operator&&(const SObject &rhs)const
+SObject&  SObject::operator&=(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(&&)
 }
 
-SObject  SObject::operator||(const SObject &rhs)const
+SObject&  SObject::operator|=(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(||)
 }
 
 
 
-SObject  SObject::operator>(const SObject &rhs)const
+SObject&  SObject::operator>(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(>)
 }
 
-SObject  SObject::operator>=(const SObject &rhs)const
+SObject&  SObject::operator>=(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(>=)
 }
 
-SObject  SObject::operator<=(const SObject &rhs)const
+SObject&  SObject::operator<=(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(<=)
 }
-SObject  SObject::lt(const SObject &rhs)const
+SObject&  SObject::lt(const SObject &rhs)
 {
 	SOBJECT_LOGIC_OP_TEMPLATE(<)
 }
 
-SObject  SObject::operator!=(const SObject &rhs)const
+SObject&  SObject::operator!=(const SObject &rhs)
 {
-	SObject o;
-	o.setInt(!(*this == rhs));
-	return o;
+	setInt(!(*this == rhs));
+	return *this;
 }
 
-SObject  SObject::eq(const SObject &rhs)const
+SObject&  SObject::eq(const SObject &rhs)
 {
-	SObject o;
-	o.setInt(*this == rhs);
-	return o;
+	setInt(*this == rhs);
+	return *this;
 
 }
 SObject & SObject::operator=(const SObject & o)
@@ -293,46 +291,6 @@ bool SObject::checkType(SObject & o)
 	return o.t == t;
 }
 
-inline bool SObject::isTable() const
-{
-	return t == Type::Table;
-}
-
-inline bool SObject::isClosure() const
-{
-	return t == Type::Closure;
-}
-
-inline bool SObject::isString() const
-{
-	return t == Type::String;
-}
-
-inline Ptr<STable> SObject::tableValue()const
-{
-	return table;
-}
-
-inline Ptr<SClosure> SObject::functionValue()const
-{
-	return function;
-}
-
-inline Ptr<SStr> SObject::strValue()const
-{
-	return str;
-}
-
-inline SFloat SObject::floatValue()const
-{
-	return dVal;
-}
-
-inline SInt SObject::intValue()const
-{
-	return iVal;
-}
-
 void SObject::error(QString& s)const
 {
 	QString msg = "internal error ";
@@ -361,6 +319,9 @@ QString SObject::repr() const
 		}
 		s.append("}");
 	}
+	else {
+		return QString::number(function->addr);
+	}
 	return s;
 }
 
@@ -378,21 +339,8 @@ void SObject::addPair(const QString& k, const SObject & v)
 	}
 }
 
-inline bool SObject::isFloat() const
-{
-	return t == Type::Float;
-}
-
-inline bool SObject::isInt() const
-{
-	return t == Type::Int;
-}
 
 
-
-SObject::~SObject()
-{
-}
 
 bool operator == (const SObject & a, const SObject & b)
 {
@@ -434,6 +382,5 @@ inline uint qHash(const SObject & a, uint seed)
 	}
 	return ::qHash(0, seed);
 }
-
 SPEKA_END
 

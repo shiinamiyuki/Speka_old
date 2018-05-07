@@ -21,6 +21,8 @@ const QString forLoop = "for";
 const QString nativeCall = "native_call";
 const QString import = "import";
 const QString stringLiteral = "string";
+const QString breakFromLoop = "break";
+const QString continueLoop = "continue";
 class STree;
 typedef QSharedPointer<STree> Node;
 class STree
@@ -102,6 +104,8 @@ public:
 	Node list();
 	Node prog();
 	Node classDef();
+	Node breakStmt();
+	Node continueStmt();
 	void newLine();
 	void check(QChar);
 	void expect(QChar);
